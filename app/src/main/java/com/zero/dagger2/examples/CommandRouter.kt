@@ -1,10 +1,16 @@
 package com.zero.dagger2.examples
 
 import com.zero.dagger2.examples.Command.Status
-import java.util.*
+import com.zero.dagger2.examples.commands.HelloWorldCommand
+import javax.inject.Inject
 
-class CommandRouter {
-    private val commands: Map<String, Command> = Collections.emptyMap()
+
+class CommandRouter @Inject constructor(helloWorldCommand: HelloWorldCommand) {
+    private val commands: HashMap<String, Command> = HashMap()
+
+    init {
+        commands[helloWorldCommand.key()] = helloWorldCommand
+    }
 
     fun route(input: String): Status? {
         val splitInput: List<String?> = split(input)
