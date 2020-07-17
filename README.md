@@ -1,5 +1,6 @@
-# dagger2-examples
+# 为什么使用dagger2
+Dagger 2是第一个使用生成的代码实现完整堆​​栈的工具
 
-1. Code reusability
-2. Class coupling
-3. Unnecessary object creations
+1. 易于测试
+2. 可重用
+3. 不需要创建一堆样板代码
