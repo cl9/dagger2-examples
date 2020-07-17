@@ -4,7 +4,7 @@ import com.zero.dagger2.examples.Command
 import com.zero.dagger2.examples.Command.Status
 import javax.inject.Inject
 
-class HelloWorldCommand @Inject constructor() : Command {
+class HelloWorldCommand : Command {
 
     override fun key(): String {
         return "hello";

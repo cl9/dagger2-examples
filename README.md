@@ -1,6 +1,6 @@
 # dagger2-examples
 
-## download gradle
+## gradle 配置
 
 - java
 
@@ -16,27 +16,41 @@ implementation 'com.google.dagger:dagger:2.28.2'
 kapt 'com.google.dagger:dagger-compiler:2.28.2'
 ```
 
-## dagger 的简单使用
+## 使用@Provides 替代@Inject
 
-<img src="http://yuml.me/diagram/scruffy/class/[CommandRouter]->[HelloWorldCommand]" >
+@Inject 注解并非在所有地方都有效：
 
-1. 使用@Inject 注解`HelloWorldCommand`的构造函数
+- 接口无法构建
+- 不能注解第三方类
+- 必须配置可配置对象
 
-```
-class HelloWorldCommand @Inject constructor() : Command
-```
+1. 去掉`HelloWorldCommand`的@Inject 注解
 
-2. 使用@Inject 注解`CommandRouter`的构造函数
-
-```
-class CommandRouter @Inject constructor(helloWorldCommand: HelloWorldCommand)
-```
-
-3. 使用@Component 注解将带有@Inject 注解的类通过其依赖关系形成对象图
+2. 修改`CommandRouter`的构造函数，入参修改为接口`Command`
 
 ```
-@Component
+class CommandRouter @Inject constructor(command: Command)
+```
+
+3. 所有@Provides 注解必须在@Modules 注解的 Module 类中
+
+```
+@Module
+class HelloCommandModule {
+    @Provides
+    fun helloWorldCommand(): Command {
+        return HelloWorldCommand()
+    }
+}
+```
+
+4. 将模块类型传递给@Component 注解的 modules 参数
+
+```
+@Component(modules = [HelloCommandModule::class])
 interface CommandRouterComponent {
     fun router(): CommandRouter
 }
 ```
+
+> @Provides 方法以 provide 前缀命名，@Module 类以 Module 后缀命名 。

@@ -5,11 +5,11 @@ import com.zero.dagger2.examples.commands.HelloWorldCommand
 import javax.inject.Inject
 
 
-class CommandRouter @Inject constructor(helloWorldCommand: HelloWorldCommand) {
+class CommandRouter @Inject constructor(command: Command) {
     private val commands: HashMap<String, Command> = HashMap()
 
     init {
-        commands[helloWorldCommand.key()] = helloWorldCommand
+        commands[command.key()] = command
     }
 
     fun route(input: String): Status? {
