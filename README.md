@@ -16,40 +16,23 @@ implementation 'com.google.dagger:dagger:2.28.2'
 kapt 'com.google.dagger:dagger-compiler:2.28.2'
 ```
 
-## 使用@Provides 替代@Inject
+## 概念
 
-@Inject 注解并非在所有地方都有效：
+- @Binds 方法是抽象
+- @Binds 是定义别名的首选方法
+- @Binds 方法必须在模块内部
 
-- 接口无法构建
-- 不能注解第三方类
-- 必须配置可配置对象
+## @Binds 替代 @Provides
 
-1. 去掉`HelloWorldCommand`的@Inject 注解
+1. 加上`HelloWorldCommand`的@Inject 注解
 
-2. 修改`CommandRouter`的构造函数，入参修改为接口`Command`
-
-```
-class CommandRouter @Inject constructor(command: Command)
-```
-
-3. 所有@Provides 注解必须在@Modules 注解的 Module 类中
+2. 请注意，方法的返回类型 Command 是 Dagger 现在知道如何提供的类型，而参数类型是 Dagger 在依赖于某物时知道使用的类型 Command。该方法是抽象的，因为仅声明它就足以告诉 Dagger 该做什么。Dagger 实际上并未调用此方法或为其提供实现。
 
 ```
 @Module
-class HelloCommandModule {
-    @Provides
-    fun helloWorldCommand(): Command {
-        return HelloWorldCommand()
-    }
-}
-```
-
-4. 将模块类型传递给@Component 注解的 modules 参数
-
-```
-@Component(modules = [HelloCommandModule::class])
-interface CommandRouterComponent {
-    fun router(): CommandRouter
+abstract class HelloCommandModule {
+    @Binds
+    abstract fun helloWorldCommand(command: HelloWorldCommand): Command
 }
 ```
 
