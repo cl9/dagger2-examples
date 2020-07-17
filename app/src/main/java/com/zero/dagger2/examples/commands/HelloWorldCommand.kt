@@ -2,9 +2,10 @@ package com.zero.dagger2.examples.commands
 
 import com.zero.dagger2.examples.Command
 import com.zero.dagger2.examples.Command.Status
+import com.zero.dagger2.examples.Outputter
 import javax.inject.Inject
 
-class HelloWorldCommand : Command {
+class HelloWorldCommand @Inject constructor(val outputter: Outputter) : Command {
 
     override fun key(): String {
         return "hello";
@@ -14,7 +15,7 @@ class HelloWorldCommand : Command {
         if (input.isNotEmpty()) {
             return Status.INVALID;
         }
-        println("world!");
+        outputter.output("world!");
         return Status.HANDLED;
     }
 }
