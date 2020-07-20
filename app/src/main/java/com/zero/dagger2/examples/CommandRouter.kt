@@ -1,16 +1,10 @@
 package com.zero.dagger2.examples
 
 import com.zero.dagger2.examples.Command.Status
-import com.zero.dagger2.examples.commands.HelloWorldCommand
 import javax.inject.Inject
 
 
-class CommandRouter @Inject constructor(command: Command) {
-    private val commands: HashMap<String, Command> = HashMap()
-
-    init {
-        commands[command.key()] = command
-    }
+class CommandRouter @Inject constructor(private val commands: Map<String, @JvmSuppressWildcards Command>) {
 
     fun route(input: String): Status? {
         val splitInput: List<String?> = split(input)
@@ -19,7 +13,7 @@ class CommandRouter @Inject constructor(command: Command) {
         }
 
         val commandKey = splitInput[0]
-        val command: Command = commands.get(commandKey) ?: return invalidCommand(input)
+        val command: Command = commands[commandKey] ?: return invalidCommand(input)
 
         val status: Status? = command.handleInput(splitInput.subList(1, splitInput.size))
         if (status === Status.INVALID) {

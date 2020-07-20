@@ -16,41 +16,31 @@ implementation 'com.google.dagger:dagger:2.28.2'
 kapt 'com.google.dagger:dagger-compiler:2.28.2'
 ```
 
-## 使用@Provides 替代@Inject
+## 多重绑定
 
-@Inject 注解并非在所有地方都有效：
+可以使用多重绑定来实现插件体系结构，例如，其中几个模块可以贡献各个插件接口实现，以便使用整个插件集。
 
-- 接口无法构建
-- 不能注解第三方类
-- 必须配置可配置对象
+1. 创建登录命令`LoginCommand`
 
-1. 去掉`HelloWorldCommand`的@Inject 注解
-
-2. 修改`CommandRouter`的构造函数，入参修改为接口`Command`
+2. 将每个命令添加到可注入的多绑定集合中
 
 ```
-class CommandRouter @Inject constructor(command: Command)
-```
-
-3. 所有@Provides 注解必须在@Modules 注解的 Module 类中
-
-```
-@Module
-class HelloCommandModule {
-    @Provides
-    fun helloWorldCommand(): Command {
-        return HelloWorldCommand()
-    }
+@Binds
+@IntoMap
+@StringKey("hello")
+abstract fun helloWorldCommand(helloWorldCommand: HelloWorldCommand): Command
 }
 ```
 
-4. 将模块类型传递给@Component 注解的 modules 参数
-
 ```
-@Component(modules = [HelloCommandModule::class])
-interface CommandRouterComponent {
-    fun router(): CommandRouter
-}
+@Binds
+@IntoMap
+@StringKey("login")
+abstract fun loginCommand(command: LoginCommand): Command
 ```
 
-> @Provides 方法以 provide 前缀命名，@Module 类以 Module 后缀命名 。
+3. `CommandRouter`入参修改成集合，以使用提供的各个不同的命令
+
+```
+class CommandRouter @Inject constructor(private val commands: Map<String, @JvmSuppressWildcards Command>)
+```
