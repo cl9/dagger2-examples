@@ -14,7 +14,6 @@ class Database @Inject constructor() {
         println("Creating a new $this");
     }
 
-    @RequiresApi(Build.VERSION_CODES.N)
     fun getAccount(username: String): Account {
         return accounts.computeIfAbsent(username, ::Account)
     }
