@@ -16,67 +16,130 @@ implementation 'com.google.dagger:dagger:2.28.2'
 kapt 'com.google.dagger:dagger-compiler:2.28.2'
 ```
 
-## 为什么要使用@Singleton
+## @Subcomponent
 
-<img src="http://yuml.me/diagram/scruffy/class/[CommandRouter]uses -.->[HelloWorldCommand],[CommandRouter]uses -.->[LoginCommand],
-[CommandRouter]uses -.->[DepositCommand],
-[Command]^-.-[HelloWorldCommand],
-[Command]^-.-[LoginCommand],
-[Command]^-.-[DepositCommand],
-[Outputter]^-.-[SystemOutputter],
+<img src="http://yuml.me/diagram/scruffy/class/
+[CommandRouterComponent]uses -.->[CommandProcessor],
+[CommandProcessor]uses -.->[CommandRouter],
+[CommandRouter]uses -.->[HelloWorldCommand],[CommandRouter]uses -.->[LoginCommand],
 [HelloWorldCommand]uses -.->[SystemOutputter],
 [LoginCommand]uses -.->[SystemOutputter],
 [DepositCommand]uses -.->[SystemOutputter],
 [LoginCommand]uses -.->[Database],
-[DepositCommand]uses -.->[Database]" >
+[DepositCommand]uses -.->[Database.Account],
+[LoginCommand]uses -.->[UserCommandsComponent],
+[UserCommandsComponent]uses -.->[DepositCommand]" >
 
-1. 创建`Database`保存登录用户
-
-2. 修改登录命令入参
-
-```
-class LoginCommand @Inject constructor(val outputter: Outputter, val database: Database) : SingleArgCommand()
-```
-
-3. 创建提现命令`DepositCommand`和对应 module
-
-4. 在`CommandRouterComponent`中添加`DepositCommandsModule`依赖
-
-> 使用以下命令运行该应用程序：<br/>
-> deposit colin 2 <br/>
-> login colin <br/>
-> 第二个命令显示 colin 其余额为 0。怎么可能呢？
-> 当我们在`Database`中添加`println("Creating a new $this");`代码，会发现打印创建了两次数据库对象，分别在`LoginCommand`和`DepositCommand`对象构造方法中传入
-
-## dagger2 实现单例
+1. 创建子组件`UserCommandsComponent`
 
 ```
-@Singleton
-final class Database { ... }
+@Subcomponent(modules = [UserCommandsModule::class])
+interface UserCommandsComponent {
+    fun router(): CommandRouter
 
-@Singleton
-@Component
-interface CommandRouterFactory {
-  ...
+    @Subcomponent.Factory
+    interface Factory {
+        fun create(@BindsInstance account: Account): UserCommandsComponent
+    }
 }
 ```
 
-## dagger2 是如何实现单例
-
-1. `Database`生成单例代码
+2. 建立父子组件之间的依赖关系
 
 ```
-...
-public static Database_Factory create() {
-  return InstanceHolder.INSTANCE;
+@Module(subcomponents = [UserCommandsComponent::class])
+interface InstallationModule
 
-private static final class InstanceHolder {
-  private static final Database_Factory INSTANCE = new Database_Factory();
+@Component(modules = [... UserCommandsComponent.InstallationModule::class])
+```
+
+3. 登录命令`LoginCommand`依赖子组件`UserCommandsComponent`
+
+```
+class LoginCommand @Inject constructor(... val userCommandsRouterFactory: UserCommandsComponent.Factory) : SingleArgCommand()
+```
+
+## dagger2 声明子组件
+
+1. builder 模式
+
+```
+@Subcomponent.Builder
+interface Builder {
+    fun build(): UserCommandsComponent
+    @BindsInstance
+    fun account(account: Account): Builder
 }
 ```
 
-2. `DaggerCommandRouter`生成获取`Database`单例代码
+2. 工厂模式
 
 ```
-this.databaseProvider = DoubleCheck.provider(Database_Factory.create());
+@Subcomponent.Factory
+interface Factory {
+    fun create(@BindsInstance account: Account): UserCommandsComponent
+}
+```
+
+## dagger2 将子组件添加到父组件
+
+定义一个带有 subcomponents 属性的@Module 模块，在父组件添加相关依赖。
+
+```
+@Module(subcomponents = [UserCommandsComponent::class])
+interface InstallationModule
+
+@Component(modules = [... UserCommandsComponent.InstallationModule::class])
+```
+
+## dagger2 是如何实现创建子组件的
+
+1. 如果使用工厂模式创建子组件实例，例如
+
+```
+@Subcomponent.Factory
+interface Factory {
+    fun create(@BindsInstance account: Account): UserCommandsComponent
+}
+```
+
+则会生成如下代码
+
+```
+private final class UserCommandsComponentFactory implements UserCommandsComponent.Factory {
+  @Override
+  public UserCommandsComponent create(Database.Account account) {
+    Preconditions.checkNotNull(account);
+    return new UserCommandsComponentImpl(account);
+  }
+}
+```
+
+2. 如果使用 builder 模式创建子组件实例，例如
+
+```
+@Subcomponent.Builder
+interface Builder {
+    fun build(): UserCommandsComponent
+    @BindsInstance
+    fun account(account: Account): Builder
+}
+```
+
+则会生成如下代码
+
+```
+private final class UserCommandsComponentBuilder implements UserCommandsComponent.Builder {
+  private Database.Account account
+  @Override
+  public UserCommandsComponentBuilder account(Database.Account account) {
+    this.account = Preconditions.checkNotNull(account);
+    return this;
+
+  @Override
+  public UserCommandsComponent build() {
+    Preconditions.checkBuilderRequirement(account, Database.Account.class);
+    return new UserCommandsComponentImpl(account);
+  }
+}
 ```
