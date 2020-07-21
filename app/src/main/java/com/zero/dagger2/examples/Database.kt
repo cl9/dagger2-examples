@@ -32,5 +32,9 @@ class Database @Inject constructor() {
             balance = balance.plus(amount)
         }
 
+        fun withdraw(amount: BigDecimal) {
+            balance = balance.subtract(amount)
+        }
+
     }
 }

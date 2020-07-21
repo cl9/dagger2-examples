@@ -16,130 +16,84 @@ implementation 'com.google.dagger:dagger:2.28.2'
 kapt 'com.google.dagger:dagger-compiler:2.28.2'
 ```
 
-## @Subcomponent
+## @Qualifier
 
 <img src="http://yuml.me/diagram/scruffy/class/
 [CommandRouterComponent]uses -.->[CommandProcessor],
 [CommandProcessor]uses -.->[CommandRouter],
 [CommandRouter]uses -.->[HelloWorldCommand],[CommandRouter]uses -.->[LoginCommand],
-[HelloWorldCommand]uses -.->[SystemOutputter],
-[LoginCommand]uses -.->[SystemOutputter],
-[DepositCommand]uses -.->[SystemOutputter],
 [LoginCommand]uses -.->[Database],
 [DepositCommand]uses -.->[Database.Account],
+[WithdrawCommand]uses -.->[Database.Account],
+[WithdrawCommand]uses -.->[BigDecimal],
+[WithdrawCommand]uses -.->[BigDecimal],
 [LoginCommand]uses -.->[UserCommandsComponent],
-[UserCommandsComponent]uses -.->[DepositCommand]" >
+[UserCommandsComponent]uses -.->[DepositCommand],
+[UserCommandsComponent]uses -.->[WithdrawCommand]" >
 
-1. 创建子组件`UserCommandsComponent`
+1. 使用`@Qualifier`注解创建提现最大最小额度限定符
 
 ```
-@Subcomponent(modules = [UserCommandsModule::class])
-interface UserCommandsComponent {
-    fun router(): CommandRouter
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class MaximumWithdrawal
 
-    @Subcomponent.Factory
-    interface Factory {
-        fun create(@BindsInstance account: Account): UserCommandsComponent
-    }
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class MinimumBalance
+```
+
+2. 创建提现命令`WithdrawCommand`并使用最大最小额度限定符
+
+```
+class WithdrawCommand @Inject constructor(... @MinimumBalance val minimumBalance: BigDecimal, @MaximumWithdrawal val maximumWithdrawal: BigDecimal) : BigDecimalCommand(outputter)
+```
+
+3. 创建`AmountsModule`提供最大最小额度
+
+```
+@Provides
+@MinimumBalance
+fun minimumBalance(): BigDecimal {
+    return BigDecimal.ZERO
+}
+
+@Provides
+@MaximumWithdrawal
+fun maximumWithdrawal(): BigDecimal {
+    return BigDecimal(1000)
 }
 ```
 
-2. 建立父子组件之间的依赖关系
-
-```
-@Module(subcomponents = [UserCommandsComponent::class])
-interface InstallationModule
-
-@Component(modules = [... UserCommandsComponent.InstallationModule::class])
-```
-
-3. 登录命令`LoginCommand`依赖子组件`UserCommandsComponent`
+4. `UserCommandsModule`include 属性添加`AmountsModule`依赖
 
 ```
 class LoginCommand @Inject constructor(... val userCommandsRouterFactory: UserCommandsComponent.Factory) : SingleArgCommand()
 ```
 
-## dagger2 声明子组件
+## dagger2 是如何通过限定符区分相同类型的
 
-1. builder 模式
-
-```
-@Subcomponent.Builder
-interface Builder {
-    fun build(): UserCommandsComponent
-    @BindsInstance
-    fun account(account: Account): Builder
-}
-```
-
-2. 工厂模式
+1. 在`AmountsModule`中通过`@MinimumBalance`注解的方法会生成以下代码
 
 ```
-@Subcomponent.Factory
-interface Factory {
-    fun create(@BindsInstance account: Account): UserCommandsComponent
-}
-```
+public final class AmountsModule_MinimumBalanceFactory implements Factory<BigDecimal> {
+  ...
 
-## dagger2 将子组件添加到父组件
-
-定义一个带有 subcomponents 属性的@Module 模块，在父组件添加相关依赖。
-
-```
-@Module(subcomponents = [UserCommandsComponent::class])
-interface InstallationModule
-
-@Component(modules = [... UserCommandsComponent.InstallationModule::class])
-```
-
-## dagger2 是如何实现创建子组件的
-
-1. 如果使用工厂模式创建子组件实例，例如
-
-```
-@Subcomponent.Factory
-interface Factory {
-    fun create(@BindsInstance account: Account): UserCommandsComponent
-}
-```
-
-则会生成如下代码
-
-```
-private final class UserCommandsComponentFactory implements UserCommandsComponent.Factory {
-  @Override
-  public UserCommandsComponent create(Database.Account account) {
-    Preconditions.checkNotNull(account);
-    return new UserCommandsComponentImpl(account);
+  public static BigDecimal minimumBalance(AmountsModule instance) {
+    return Preconditions.checkNotNull(instance.minimumBalance(), "Cannot return null from a non-@Nullable @Provides method");
   }
 }
 ```
 
-2. 如果使用 builder 模式创建子组件实例，例如
+2. 在`AmountsModule`中通过`@MaximumWithdrawal`注解的方法会生成以下代码
 
 ```
-@Subcomponent.Builder
-interface Builder {
-    fun build(): UserCommandsComponent
-    @BindsInstance
-    fun account(account: Account): Builder
-}
-```
+public final class AmountsModule_MaximumWithdrawalFactory implements Factory<BigDecimal> {
+  ...
 
-则会生成如下代码
-
-```
-private final class UserCommandsComponentBuilder implements UserCommandsComponent.Builder {
-  private Database.Account account
-  @Override
-  public UserCommandsComponentBuilder account(Database.Account account) {
-    this.account = Preconditions.checkNotNull(account);
-    return this;
-
-  @Override
-  public UserCommandsComponent build() {
-    Preconditions.checkBuilderRequirement(account, Database.Account.class);
-    return new UserCommandsComponentImpl(account);
+  public static BigDecimal maximumWithdrawal(AmountsModule instance) {
+    return Preconditions.checkNotNull(instance.maximumWithdrawal(), "Cannot return null from a non-@Nullable @Provides method");
   }
 }
+
 ```
