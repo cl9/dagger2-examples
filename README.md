@@ -16,84 +16,63 @@ implementation 'com.google.dagger:dagger:2.28.2'
 kapt 'com.google.dagger:dagger-compiler:2.28.2'
 ```
 
-## @Qualifier
+## 自定义 Scope
 
 <img src="http://yuml.me/diagram/scruffy/class/
 [CommandRouterComponent]uses -.->[CommandProcessor],
 [CommandProcessor]uses -.->[CommandRouter],
 [CommandRouter]uses -.->[HelloWorldCommand],[CommandRouter]uses -.->[LoginCommand],
 [LoginCommand]uses -.->[Database],
-[DepositCommand]uses -.->[Database.Account],
-[WithdrawCommand]uses -.->[Database.Account],
+[DepositCommand]uses -.->[WithdrawalLimiter],
 [WithdrawCommand]uses -.->[BigDecimal],
-[WithdrawCommand]uses -.->[BigDecimal],
+[WithdrawCommand]uses -.->[WithdrawalLimiter],
+[WithdrawalLimiter]uses -.->[BigDecimal],
 [LoginCommand]uses -.->[UserCommandsComponent],
 [UserCommandsComponent]uses -.->[DepositCommand],
 [UserCommandsComponent]uses -.->[WithdrawCommand]" >
 
-1. 使用`@Qualifier`注解创建提现最大最小额度限定符
+1. 创建`WithdrawalLimiter`控制提现最大额度
+
+2. 创建自定义 Scope`PerSession`
 
 ```
-@Qualifier
+@Scope
 @Retention(AnnotationRetention.RUNTIME)
-annotation class MaximumWithdrawal
-
-@Qualifier
-@Retention(AnnotationRetention.RUNTIME)
-annotation class MinimumBalance
+annotation class PerSession
 ```
 
-2. 创建提现命令`WithdrawCommand`并使用最大最小额度限定符
+3. 通过组件`UserCommandsComponent`的生命周期控制`WithdrawalLimiter`的生命周期
 
 ```
-class WithdrawCommand @Inject constructor(... @MinimumBalance val minimumBalance: BigDecimal, @MaximumWithdrawal val maximumWithdrawal: BigDecimal) : BigDecimalCommand(outputter)
+@PerSession
+interface UserCommandsComponent
+
+@PerSession
+class WithdrawalLimiter
 ```
 
-3. 创建`AmountsModule`提供最大最小额度
+## 自定义 Scope VS @Singleton
+
+1. 作用域的名称是没有意义的
+2. 作用域实例的生存期与具有该作用域的组件的生存期直接相关
+3. @Singleton 实际上只是另一个作用域注解
+
+## @Singleton Database 和@PerSession WithdrawalLimiter 的区别
+
+- 在`CommandRouterComponent`中的所有对象之间共享一个`Database`实例
+
+- 在每个`UserCommandsComponent`中都存在一个单独的`WithdrawalLimiter`实例
+
+## dagger2 是如何通过自定义 Scope 限制生命周期
+
+通过@PerSession 生成的`WithdrawalLimiter`代码
 
 ```
-@Provides
-@MinimumBalance
-fun minimumBalance(): BigDecimal {
-    return BigDecimal.ZERO
-}
-
-@Provides
-@MaximumWithdrawal
-fun maximumWithdrawal(): BigDecimal {
-    return BigDecimal(1000)
-}
-```
-
-4. `UserCommandsModule`include 属性添加`AmountsModule`依赖
-
-```
-class LoginCommand @Inject constructor(... val userCommandsRouterFactory: UserCommandsComponent.Factory) : SingleArgCommand()
-```
-
-## dagger2 是如何通过限定符区分相同类型的
-
-1. 在`AmountsModule`中通过`@MinimumBalance`注解的方法会生成以下代码
-
-```
-public final class AmountsModule_MinimumBalanceFactory implements Factory<BigDecimal> {
+public final class WithdrawalLimiter_Factory implements Factory<WithdrawalLimiter> {
   ...
 
-  public static BigDecimal minimumBalance(AmountsModule instance) {
-    return Preconditions.checkNotNull(instance.minimumBalance(), "Cannot return null from a non-@Nullable @Provides method");
+  public static WithdrawalLimiter_Factory create(Provider<BigDecimal> maximumWithdrawalProvider) {
+    return new WithdrawalLimiter_Factory(maximumWithdrawalProvider);
   }
 }
-```
-
-2. 在`AmountsModule`中通过`@MaximumWithdrawal`注解的方法会生成以下代码
-
-```
-public final class AmountsModule_MaximumWithdrawalFactory implements Factory<BigDecimal> {
-  ...
-
-  public static BigDecimal maximumWithdrawal(AmountsModule instance) {
-    return Preconditions.checkNotNull(instance.maximumWithdrawal(), "Cannot return null from a non-@Nullable @Provides method");
-  }
-}
-
 ```
