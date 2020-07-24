@@ -1,11 +1,14 @@
 package com.zero.dagger2.examples.di.modules
 
 import com.zero.dagger2.examples.Command
+import com.zero.dagger2.examples.Database.Account
 import com.zero.dagger2.examples.commands.LoginCommand
 import dagger.Binds
+import dagger.BindsOptionalOf
 import dagger.Module
 import dagger.multibindings.IntoMap
 import dagger.multibindings.StringKey
+
 
 @Module
 abstract class LoginCommandModule {
@@ -13,4 +16,7 @@ abstract class LoginCommandModule {
     @IntoMap
     @StringKey("login")
     abstract fun loginCommand(command: LoginCommand): Command
+
+    @BindsOptionalOf
+    abstract fun optionalAccount(): Account
 }
